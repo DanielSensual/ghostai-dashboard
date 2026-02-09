@@ -17,6 +17,31 @@ const PLATFORM_ICONS = {
   instagram: '📸',
 };
 
+const TOKEN_STORAGE_KEY = 'ghostai-token';
+
+function bootstrapTokenFromBrowser() {
+  if (typeof window === 'undefined') return '';
+
+  try {
+    const saved = localStorage.getItem(TOKEN_STORAGE_KEY) || '';
+    const hash = window.location.hash.replace('#', '').trim();
+    const token = hash || saved || '';
+
+    if (token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    }
+
+    // Remove token hash from address bar so it is not leaked through UI logs/screenshots.
+    if (hash && window.history?.replaceState) {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
+
+    return token;
+  } catch {
+    return '';
+  }
+}
+
 function StatCard({ label, value, icon, subtitle, color }) {
   return (
     <div className="stat-card">
@@ -174,13 +199,26 @@ function QueueSummary({ queue }) {
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState('');
+  const [token, setToken] = useState(() => bootstrapTokenFromBrowser());
+  const [loading, setLoading] = useState(() => Boolean(token));
   const [authenticated, setAuthenticated] = useState(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchDataWithToken = useCallback(async (activeToken) => {
+    if (!activeToken) {
+      setAuthenticated(false);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/sync?token=${encodeURIComponent(token)}`);
+      const res = await fetch('/api/sync', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${activeToken}`,
+        },
+        cache: 'no-store',
+      });
+
       if (res.ok) {
         const json = await res.json();
         setData(json);
@@ -189,33 +227,31 @@ export default function Dashboard() {
         setAuthenticated(false);
       }
     } catch {
-      // ignore
+      setAuthenticated(false);
     }
-    setLoading(false);
-  }, [token]);
 
-  useEffect(() => {
-    // Check for token in URL hash or localStorage
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('ghostai-token') : '';
-    const hash = typeof window !== 'undefined' ? window.location.hash.replace('#', '') : '';
-    const t = hash || saved || '';
-    if (t) {
-      setToken(t);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('ghostai-token', t);
-        window.location.hash = '';
-      }
-    } else {
-      setLoading(false);
-    }
+    setLoading(false);
   }, []);
 
+  const fetchData = useCallback(async () => {
+    await fetchDataWithToken(token);
+  }, [fetchDataWithToken, token]);
+
   useEffect(() => {
-    if (token) {
-      fetchData();
-      const interval = setInterval(fetchData, 30000); // Refresh every 30s
-      return () => clearInterval(interval);
-    }
+    if (!token) return undefined;
+
+    const initialRun = setTimeout(() => {
+      void fetchData();
+    }, 0);
+
+    const interval = setInterval(() => {
+      void fetchData();
+    }, 30000); // Refresh every 30s
+
+    return () => {
+      clearTimeout(initialRun);
+      clearInterval(interval);
+    };
   }, [token, fetchData]);
 
   // Login screen
@@ -230,16 +266,26 @@ export default function Dashboard() {
           </div>
           <form onSubmit={(e) => {
             e.preventDefault();
-            const t = e.target.token.value;
+            const t = String(e.target.token.value || '').trim();
+            if (!t) {
+              setAuthenticated(false);
+              setLoading(false);
+              return;
+            }
+
             setToken(t);
-            localStorage.setItem('ghostai-token', t);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(TOKEN_STORAGE_KEY, t);
+            }
             setLoading(true);
-            setTimeout(fetchData, 100);
+            void fetchDataWithToken(t);
           }}>
             <input
               name="token"
               type="password"
               placeholder="Enter access token"
+              autoComplete="off"
+              spellCheck={false}
               className="w-full px-4 py-3 bg-[--color-background] border border-[--color-border] rounded-lg text-sm focus:outline-none focus:border-[--color-accent] transition-colors"
             />
             <button
@@ -276,7 +322,10 @@ export default function Dashboard() {
             </div>
           </div>
           <button
-            onClick={fetchData}
+            onClick={() => {
+              setLoading(true);
+              void fetchData();
+            }}
             className="px-4 py-2 text-sm border border-[--color-border] rounded-lg hover:border-[--color-accent] transition-colors"
           >
             ↻ Refresh
