@@ -29,6 +29,9 @@ In `/Users/danielcastillo/Projects/Websites/Bots/ghostai-dashboard/.env.local`:
 DASHBOARD_SECRET=your-strong-secret
 # Optional override if bot folder is elsewhere:
 # BOT_COMMAND_ROOT=/absolute/path/to/ghostai-x-bot
+# Optional (recommended for deployed dashboard):
+# COMMAND_AGENT_URL=https://your-agent-host
+# COMMAND_AGENT_TOKEN=your-agent-token
 ```
 
 ## Run
@@ -50,3 +53,24 @@ Open [http://localhost:3000](http://localhost:3000), enter `DASHBOARD_SECRET`, t
   - `--x-caption` (for X, <=280)
   - `--main-caption` (LinkedIn/Facebook/Instagram)
 
+## Deployed Dashboard + Live Commands
+
+For Vercel-hosted command execution, run a local command agent in `ghostai-x-bot`:
+
+```bash
+cd /Users/danielcastillo/Projects/Websites/Bots/ghostai-x-bot
+COMMAND_AGENT_TOKEN=your-agent-token npm run command:agent
+```
+
+Expose it via tunnel (example):
+
+```bash
+ngrok http 8787
+```
+
+Then set on Vercel:
+
+- `COMMAND_AGENT_URL=https://<ngrok-or-public-url>`
+- `COMMAND_AGENT_TOKEN=your-agent-token`
+
+The dashboard `/api/commands` will proxy to this worker and keep full run history/output.

@@ -289,7 +289,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(() => Boolean(token));
   const [authenticated, setAuthenticated] = useState(false);
 
-  const [commandData, setCommandData] = useState({ commands: [], runs: [], runningCount: 0 });
+  const [commandData, setCommandData] = useState({ commands: [], runs: [], runningCount: 0, executorMode: 'unknown' });
   const [commandForms, setCommandForms] = useState({});
   const [commandsLoading, setCommandsLoading] = useState(false);
   const [commandError, setCommandError] = useState('');
@@ -328,6 +328,7 @@ export default function Dashboard() {
         commands: Array.isArray(json.commands) ? json.commands : [],
         runs: Array.isArray(json.runs) ? json.runs : [],
         runningCount: Number.isFinite(json.runningCount) ? json.runningCount : 0,
+        executorMode: String(json.executorMode || 'unknown'),
       });
       setCommandForms((prev) => {
         const seed = createInitialFormValues(Array.isArray(json.commands) ? json.commands : []);
@@ -536,6 +537,7 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <span className="run-chip">{commandData.executorMode}</span>
             <span className="run-chip">{commandData.runningCount} active</span>
             <button
               type="button"
