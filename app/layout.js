@@ -1,4 +1,17 @@
 import "./globals.css";
+import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-ibm-plex-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
 
 export const metadata = {
   title: "GhostAI Dashboard — Analytics & Command Center",
@@ -7,12 +20,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      </head>
+    <html lang="en" className={`${spaceGrotesk.variable} ${ibmPlexMono.variable}`}>
       <body>{children}</body>
     </html>
   );
