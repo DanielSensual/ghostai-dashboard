@@ -2,67 +2,44 @@
 
 import { useEffect, useState, useCallback } from 'react';
 
-const TOKEN_STORAGE_KEY = 'ghostai-token';
 const DAILY_OUTREACH_LIMIT = 50;
-
-function bootstrapTokenFromBrowser() {
-    if (typeof window === 'undefined') return '';
-
-    try {
-        const saved = localStorage.getItem(TOKEN_STORAGE_KEY) || '';
-        const hash = window.location.hash.replace('#', '').trim();
-        const token = hash || saved || '';
-
-        if (token) {
-            localStorage.setItem(TOKEN_STORAGE_KEY, token);
-        }
-
-        if (hash && window.history?.replaceState) {
-            window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-        }
-
-        return token;
-    } catch {
-        return '';
-    }
-}
 
 function StatCard({ label, value, icon, color, subtitle }) {
     return (
         <div className="stat-card">
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-[--color-text-muted] text-sm font-medium">{label}</span>
-                <span className="text-xl">{icon}</span>
+            <div className="stat-card-header">
+                <span className="stat-card-label">{label}</span>
+                <span className="stat-card-icon-lg">{icon}</span>
             </div>
-            <div className="text-3xl font-bold" style={{ color: color || 'var(--color-text-primary)' }}>
+            <div className="stat-card-value" style={{ color: color || 'var(--color-text-primary)' }}>
                 {value}
             </div>
-            {subtitle ? <div className="text-xs text-[--color-text-muted] mt-1">{subtitle}</div> : null}
+            {subtitle ? <div className="stat-card-subtitle">{subtitle}</div> : null}
         </div>
     );
 }
 
 function CampaignTable({ campaigns }) {
     if (!campaigns.length) {
-        return <div className="text-sm text-[--color-text-muted]">No campaign data synced yet.</div>;
+        return <div className="empty-state">No campaign data synced yet.</div>;
     }
 
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <div className="table-scroll">
+            <table className="data-table">
                 <thead>
-                    <tr className="text-left border-b border-[--color-border]">
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Niche</th>
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">City</th>
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Campaigns</th>
+                    <tr>
+                        <th>Niche</th>
+                        <th>City</th>
+                        <th>Campaigns</th>
                     </tr>
                 </thead>
                 <tbody>
                     {campaigns.map((row, idx) => (
-                        <tr key={`${row.niche}-${row.city}-${idx}`} className="border-b border-[--color-border] last:border-0">
-                            <td className="py-2 pr-3">{row.niche}</td>
-                            <td className="py-2 pr-3 text-[--color-text-secondary]">{row.city}</td>
-                            <td className="py-2 pr-3">{row.count}</td>
+                        <tr key={`${row.niche}-${row.city}-${idx}`}>
+                            <td>{row.niche}</td>
+                            <td className="text-secondary">{row.city}</td>
+                            <td>{row.count}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -73,39 +50,33 @@ function CampaignTable({ campaigns }) {
 
 function TopLeadsTable({ topLeads }) {
     if (!topLeads.length) {
-        return <div className="text-sm text-[--color-text-muted]">No top leads synced yet.</div>;
+        return <div className="empty-state">No top leads synced yet.</div>;
     }
 
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <div className="table-scroll">
+            <table className="data-table">
                 <thead>
-                    <tr className="text-left border-b border-[--color-border]">
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Lead</th>
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Score</th>
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">City</th>
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Segment</th>
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Offer</th>
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Email</th>
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Status</th>
+                    <tr>
+                        <th>Lead</th>
+                        <th>Score</th>
+                        <th>City</th>
+                        <th>Segment</th>
+                        <th>Offer</th>
+                        <th>Email</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
                     {topLeads.map((lead, idx) => (
-                        <tr key={`${lead.name}-${idx}`} className="border-b border-[--color-border] last:border-0">
-                            <td className="py-2 pr-3">{lead.name}</td>
-                            <td className="py-2 pr-3">
-                                <span className="text-[--color-accent] font-semibold">{lead.score}</span>
-                            </td>
-                            <td className="py-2 pr-3 text-[--color-text-secondary]">{lead.city || '—'}</td>
-                            <td className="py-2 pr-3 text-[--color-text-secondary]">{lead.segment || '—'}</td>
-                            <td className="py-2 pr-3 text-[--color-text-secondary]">{lead.offer || '—'}</td>
-                            <td className="py-2 pr-3 text-[--color-text-secondary]">{lead.email || '—'}</td>
-                            <td className="py-2 pr-3">
-                                <span className="px-2 py-0.5 rounded-full text-xs bg-[--color-border] capitalize">
-                                    {lead.status || 'new'}
-                                </span>
-                            </td>
+                        <tr key={`${lead.name}-${idx}`}>
+                            <td>{lead.name}</td>
+                            <td><span className="text-accent font-semibold">{lead.score}</span></td>
+                            <td className="text-secondary">{lead.city || '—'}</td>
+                            <td className="text-secondary">{lead.segment || '—'}</td>
+                            <td className="text-secondary">{lead.offer || '—'}</td>
+                            <td className="text-secondary">{lead.email || '—'}</td>
+                            <td><span className="status-badge">{lead.status || 'new'}</span></td>
                         </tr>
                     ))}
                 </tbody>
@@ -116,31 +87,31 @@ function TopLeadsTable({ topLeads }) {
 
 function SegmentBreakdownTable({ rows }) {
     if (!rows.length) {
-        return <div className="text-sm text-[--color-text-muted]">No segment performance data synced yet.</div>;
+        return <div className="empty-state">No segment performance data synced yet.</div>;
     }
 
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <div className="table-scroll">
+            <table className="data-table">
                 <thead>
-                    <tr className="text-left border-b border-[--color-border]">
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Segment</th>
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Leads</th>
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Replied</th>
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Booked</th>
-                        <th className="py-2 pr-3 font-medium text-[--color-text-muted]">Win Rate</th>
+                    <tr>
+                        <th>Segment</th>
+                        <th>Leads</th>
+                        <th>Replied</th>
+                        <th>Booked</th>
+                        <th>Win Rate</th>
                     </tr>
                 </thead>
                 <tbody>
                     {rows.map((row, idx) => {
                         const winRate = row.leads > 0 ? ((row.booked / row.leads) * 100).toFixed(1) : '0.0';
                         return (
-                            <tr key={`${row.segment}-${idx}`} className="border-b border-[--color-border] last:border-0">
-                                <td className="py-2 pr-3">{row.segment}</td>
-                                <td className="py-2 pr-3">{row.leads}</td>
-                                <td className="py-2 pr-3">{row.replied}</td>
-                                <td className="py-2 pr-3">{row.booked}</td>
-                                <td className="py-2 pr-3 text-[--color-accent] font-semibold">{winRate}%</td>
+                            <tr key={`${row.segment}-${idx}`}>
+                                <td>{row.segment}</td>
+                                <td>{row.leads}</td>
+                                <td>{row.replied}</td>
+                                <td>{row.booked}</td>
+                                <td className="text-accent font-semibold">{winRate}%</td>
                             </tr>
                         );
                     })}
@@ -152,19 +123,21 @@ function SegmentBreakdownTable({ rows }) {
 
 function DailySendSeriesChart({ rows }) {
     if (!rows.length) {
-        return <div className="text-sm text-[--color-text-muted]">No daily send series synced yet.</div>;
+        return <div className="empty-state">No daily send series synced yet.</div>;
     }
 
     const maxCount = Math.max(...rows.map((row) => Number(row.count || 0)), 1);
     return (
-        <div className="flex items-end gap-1 h-32">
+        <div className="daily-chart">
             {rows.slice(-14).map((row, idx) => {
                 const count = Number(row.count || 0);
                 const heightPct = Math.max(0, (count / maxCount) * 100);
                 return (
-                    <div key={`${row.date}-${idx}`} className="flex-1 flex flex-col items-center gap-1">
-                        <div className="w-full rounded-t bg-[--color-accent]" style={{ height: `${heightPct}%`, minHeight: count > 0 ? '4px' : '0' }} />
-                        <span className="text-[10px] text-[--color-text-muted]">{(row.date || '').slice(5)}</span>
+                    <div key={`${row.date}-${idx}`} className="daily-chart-col">
+                        <div className="daily-chart-bar-wrap">
+                            <div className="chart-bar" style={{ height: `${heightPct}%`, minHeight: count > 0 ? '4px' : '0' }} />
+                        </div>
+                        <span className="daily-chart-label">{(row.date || '').slice(5)}</span>
                     </div>
                 );
             })}
@@ -173,49 +146,28 @@ function DailySendSeriesChart({ rows }) {
 }
 
 export default function LeadPipelinePage() {
-    const [token, setToken] = useState(() => bootstrapTokenFromBrowser());
-    const [loading, setLoading] = useState(() => Boolean(token));
-    const [authenticated, setAuthenticated] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
     const [copied, setCopied] = useState(false);
 
-    const fetchLeadDataWithToken = useCallback(async (activeToken) => {
-        if (!activeToken) {
-            setAuthenticated(false);
-            setLoading(false);
-            return;
-        }
-
+    const fetchLeadData = useCallback(async () => {
         try {
             const response = await fetch('/api/lead-pipeline', {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${activeToken}`,
-                },
                 cache: 'no-store',
             });
 
             if (response.ok) {
                 const payload = await response.json();
                 setData(payload);
-                setAuthenticated(true);
-            } else {
-                setAuthenticated(false);
             }
         } catch {
-            setAuthenticated(false);
+            // silent
         }
 
         setLoading(false);
     }, []);
 
-    const fetchLeadData = useCallback(async () => {
-        await fetchLeadDataWithToken(token);
-    }, [fetchLeadDataWithToken, token]);
-
     useEffect(() => {
-        if (!token) return undefined;
-
         const firstRun = setTimeout(() => {
             void fetchLeadData();
         }, 0);
@@ -228,7 +180,7 @@ export default function LeadPipelinePage() {
             clearTimeout(firstRun);
             clearInterval(interval);
         };
-    }, [token, fetchLeadData]);
+    }, [fetchLeadData]);
 
     const pipeline = data?.pipeline || {};
     const campaigns = data?.campaigns || [];
@@ -285,66 +237,15 @@ export default function LeadPipelinePage() {
         }
     };
 
-    if (!authenticated) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="stat-card glow-border max-w-md w-full mx-4">
-                    <div className="text-center mb-6">
-                        <div className="text-4xl mb-2">🎯</div>
-                        <h1 className="text-xl font-bold">GhostAI Lead Pipeline</h1>
-                        <p className="text-sm text-[--color-text-muted] mt-1">
-                            Secure handoff page for AI agent continuation
-                        </p>
-                    </div>
-                    <form
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            const nextToken = String(event.target.token.value || '').trim();
-                            if (!nextToken) {
-                                setAuthenticated(false);
-                                setLoading(false);
-                                return;
-                            }
-
-                            setToken(nextToken);
-                            if (typeof window !== 'undefined') {
-                                localStorage.setItem(TOKEN_STORAGE_KEY, nextToken);
-                            }
-
-                            setLoading(true);
-                            void fetchLeadDataWithToken(nextToken);
-                        }}
-                    >
-                        <input
-                            name="token"
-                            type="password"
-                            placeholder="Enter access token"
-                            autoComplete="off"
-                            spellCheck={false}
-                            className="w-full px-4 py-3 bg-[--color-background] border border-[--color-border] rounded-lg text-sm focus:outline-none focus:border-[--color-accent] transition-colors"
-                        />
-                        <button
-                            type="submit"
-                            className="w-full mt-4 px-4 py-3 bg-[--color-accent] text-white rounded-lg text-sm font-medium hover:brightness-110 transition-all"
-                        >
-                            Authenticate
-                        </button>
-                    </form>
-                    {loading ? <div className="text-center text-sm text-[--color-text-muted] mt-4 animate-pulse-subtle">Verifying...</div> : null}
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="min-h-screen pb-12">
-            <header className="border-b border-[--color-border] px-6 py-4">
-                <div className="max-w-7xl mx-auto flex justify-between items-center gap-4">
-                    <div className="flex items-center gap-3">
-                        <span className="text-2xl">🎯</span>
+        <div className="dashboard">
+            <header className="dashboard-header">
+                <div className="dashboard-header-inner">
+                    <div className="dashboard-header-title-group">
+                        <span className="dashboard-header-emoji">🎯</span>
                         <div>
-                            <h1 className="text-lg font-bold">GhostAI Systems Lead Pipeline</h1>
-                            <p className="text-xs text-[--color-text-muted]">
+                            <h1 className="dashboard-title">GhostAI Systems Lead Pipeline</h1>
+                            <p className="dashboard-sync-status">
                                 {data?.lastSync ? `Last sync: ${new Date(data.lastSync).toLocaleString()}` : 'Awaiting first sync'}
                             </p>
                         </div>
@@ -354,15 +255,16 @@ export default function LeadPipelinePage() {
                             setLoading(true);
                             void fetchLeadData();
                         }}
-                        className="px-4 py-2 text-sm border border-[--color-border] rounded-lg hover:border-[--color-accent] transition-colors"
+                        className="refresh-btn"
                     >
                         ↻ Refresh
                     </button>
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-6 mt-6 space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            <main className="dashboard-main">
+                {/* Lead Stats */}
+                <div className="lead-stats-grid">
                     <StatCard label="Total Leads" value={pipeline.totalLeads || 0} icon="📦" />
                     <StatCard label="Hot Leads" value={pipeline.hotLeads || 0} icon="🔥" color="var(--color-accent)" />
                     <StatCard label="With Email" value={pipeline.withEmail || 0} icon="📧" />
@@ -378,58 +280,58 @@ export default function LeadPipelinePage() {
                     />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Campaign Matrix + Agent Pack */}
+                <div className="two-col-grid">
                     <div className="stat-card">
-                        <h2 className="font-semibold mb-3 flex items-center gap-2">
+                        <h2 className="section-title-icon">
                             <span>🗂️</span> Campaign Matrix
                         </h2>
                         <CampaignTable campaigns={campaigns} />
                     </div>
 
                     <div className="stat-card">
-                        <div className="flex items-center justify-between gap-3 mb-3">
-                            <h2 className="font-semibold flex items-center gap-2">
+                        <div className="continuation-header">
+                            <h2 className="section-title-icon">
                                 <span>🤖</span> Agent Continuation Pack
                             </h2>
-                            <button
-                                onClick={copyContinuationPack}
-                                className="px-3 py-1.5 text-xs border border-[--color-border] rounded-lg hover:border-[--color-accent] transition-colors"
-                            >
+                            <button onClick={copyContinuationPack} className="copy-btn">
                                 {copied ? 'Copied' : 'Copy Pack'}
                             </button>
                         </div>
-                        <p className="text-xs text-[--color-text-muted] mb-3">
+                        <p className="continuation-desc">
                             Any AI agent can copy this block and continue the pipeline immediately.
                         </p>
                         <textarea
                             readOnly
                             value={continuationPack}
-                            className="w-full min-h-72 text-xs bg-[--color-background] border border-[--color-border] rounded-lg p-3 focus:outline-none"
+                            className="continuation-textarea"
                         />
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Segment Win Rate + Daily Send */}
+                <div className="two-col-grid">
                     <div className="stat-card">
-                        <h2 className="font-semibold mb-3 flex items-center gap-2">
+                        <h2 className="section-title-icon">
                             <span>📊</span> Segment Win Rate
                         </h2>
                         <SegmentBreakdownTable rows={segmentBreakdown.slice(0, 20)} />
                     </div>
 
                     <div className="stat-card">
-                        <h2 className="font-semibold mb-3 flex items-center gap-2">
+                        <h2 className="section-title-icon">
                             <span>📈</span> Daily Send Series
                         </h2>
-                        <p className="text-xs text-[--color-text-muted] mb-3">
+                        <p className="send-series-meta">
                             Last 7 days sends: {weeklySendCount} | Reply rate: {replyRate.toFixed(2)}% | Book rate: {bookRate.toFixed(2)}%
                         </p>
                         <DailySendSeriesChart rows={dailySendSeries} />
                     </div>
                 </div>
 
+                {/* Top Leads */}
                 <div className="stat-card">
-                    <h2 className="font-semibold mb-3 flex items-center gap-2">
+                    <h2 className="section-title-icon">
                         <span>🏆</span> Top Leads
                     </h2>
                     <TopLeadsTable topLeads={topLeads.slice(0, 30)} />

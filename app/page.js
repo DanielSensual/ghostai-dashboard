@@ -17,39 +17,61 @@ const PLATFORM_ICONS = {
   instagram: '◉',
 };
 
-const TOKEN_STORAGE_KEY = 'ghostai-token';
+const CLAWBOT_TYPE_STYLES = {
+  message: { label: 'MSG', color: '#22d3ee', bg: 'rgba(34,211,238,0.12)' },
+  tool: { label: 'TOOL', color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
+  error: { label: 'ERR', color: '#fb7185', bg: 'rgba(251,113,133,0.12)' },
+  browser: { label: 'WEB', color: '#c084fc', bg: 'rgba(192,132,252,0.12)' },
+  system: { label: 'SYS', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+  unknown: { label: '???', color: '#64748b', bg: 'rgba(100,116,139,0.12)' },
+};
 
-function bootstrapTokenFromBrowser() {
-  if (typeof window === 'undefined') return '';
-
-  try {
-    const saved = localStorage.getItem(TOKEN_STORAGE_KEY) || '';
-    const hash = window.location.hash.replace('#', '').trim();
-    const token = hash || saved || '';
-
-    if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
-
-    if (hash && window.history?.replaceState) {
-      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-    }
-
-    return token;
-  } catch {
-    return '';
+function ClawbotActivityFeed({ activities }) {
+  if (!activities || activities.length === 0) {
+    return <div className="empty-state">No ClawBot activity yet. Waiting for events...</div>;
   }
+
+  return (
+    <div className="clawbot-feed">
+      {activities.slice(0, 30).map((event, i) => {
+        const style = CLAWBOT_TYPE_STYLES[event.type] || CLAWBOT_TYPE_STYLES.unknown;
+        const timeStr = event.timestamp
+          ? new Date(event.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          : '';
+        return (
+          <div key={`${event.timestamp}-${i}`} className="clawbot-entry">
+            <div className="clawbot-entry-header">
+              <span className="clawbot-type-badge" style={{ color: style.color, background: style.bg }}>
+                {style.label}
+              </span>
+              {event.channel && (
+                <span className="clawbot-channel">{event.channel}</span>
+              )}
+              <span className="clawbot-time">{timeStr}</span>
+              {event.status === 'error' && (
+                <span className="clawbot-status-error">✗</span>
+              )}
+            </div>
+            <div className="clawbot-message">{event.message}</div>
+            {event.detail && <div className="clawbot-detail">{event.detail}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function StatCard({ label, value, icon, subtitle, color }) {
   return (
     <div className="stat-card">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[--color-text-muted] text-xs font-medium uppercase tracking-wide">{label}</span>
-        <span className="text-lg">{icon}</span>
+      <div className="stat-card-header">
+        <span className="stat-card-label">{label}</span>
+        <span className="stat-card-icon">{icon}</span>
       </div>
-      <div className="text-3xl font-bold" style={{ color: color || 'var(--color-text-primary)' }}>
+      <div className="stat-card-value" style={{ color: color || 'var(--color-text-primary)' }}>
         {value}
       </div>
-      {subtitle && <div className="text-xs text-[--color-text-muted] mt-1">{subtitle}</div>}
+      {subtitle && <div className="stat-card-subtitle">{subtitle}</div>}
     </div>
   );
 }
@@ -57,21 +79,21 @@ function StatCard({ label, value, icon, subtitle, color }) {
 function PlatformStatus({ platform, data }) {
   const statusClass = data.status === 'connected' ? 'online' : data.status === 'warning' ? 'warning' : 'offline';
   return (
-    <div className="flex items-center justify-between py-3 border-b border-[--color-border] last:border-0">
-      <div className="flex items-center gap-3">
-        <span className="w-7 h-7 rounded-lg bg-[--color-surface-elevated] border border-[--color-border] flex items-center justify-center text-xs font-semibold">
+    <div className="platform-row">
+      <div className="platform-info">
+        <span className="platform-icon-box">
           {PLATFORM_ICONS[platform] || platform[0]?.toUpperCase()}
         </span>
         <div>
-          <div className="font-medium capitalize">{platform === 'x' ? 'X (Twitter)' : platform}</div>
-          <div className="text-xs text-[--color-text-muted]">
+          <div className="platform-name">{platform === 'x' ? 'X (Twitter)' : platform}</div>
+          <div className="platform-last-post">
             {data.lastPost ? `Last post: ${new Date(data.lastPost).toLocaleString()}` : 'No post recorded'}
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="platform-status">
         <span className={`status-dot ${statusClass}`} />
-        <span className="text-xs text-[--color-text-secondary] capitalize">{data.status}</span>
+        <span className="platform-status-label">{data.status}</span>
       </div>
     </div>
   );
@@ -80,10 +102,10 @@ function PlatformStatus({ platform, data }) {
 function PillarBar({ name, value, maxValue, color }) {
   const pct = maxValue > 0 ? (value / maxValue) * 100 : 0;
   return (
-    <div className="mb-3">
-      <div className="flex justify-between text-sm mb-1">
-        <span className="capitalize font-medium">{name}</span>
-        <span className="text-[--color-text-muted]">{value} posts</span>
+    <div className="pillar-row">
+      <div className="pillar-label">
+        <span className="pillar-name">{name}</span>
+        <span className="pillar-count">{value} posts</span>
       </div>
       <div className="pillar-bar">
         <div className="pillar-bar-fill" style={{ width: `${pct}%`, background: color }} />
@@ -94,27 +116,27 @@ function PillarBar({ name, value, maxValue, color }) {
 
 function PostTimeline({ posts }) {
   if (!posts || posts.length === 0) {
-    return <div className="text-[--color-text-muted] text-sm py-4">No posts recorded yet.</div>;
+    return <div className="empty-state">No posts recorded yet.</div>;
   }
 
   return (
-    <div className="mt-2">
+    <div className="timeline-list">
       {posts.slice(0, 10).map((post, i) => (
         <div key={`${post.timestamp || 'unknown'}-${i}`} className="timeline-entry">
-          <div className="flex items-center flex-wrap gap-2 mb-1">
-            <span className="text-xs text-[--color-text-muted]">
+          <div className="timeline-meta">
+            <span className="timeline-time">
               {post.timestamp ? new Date(post.timestamp).toLocaleString() : 'Unknown time'}
             </span>
             <span
-              className="text-xs px-2 py-0.5 rounded-full capitalize"
+              className="timeline-pillar-tag"
               style={{ background: `${PILLAR_COLORS[post.pillar] || '#64748b'}30`, color: PILLAR_COLORS[post.pillar] || '#64748b' }}
             >
               {post.pillar || 'unknown'}
             </span>
-            {post.aiGenerated && <span className="text-xs text-[--color-accent]">AI</span>}
-            {post.hasVideo && <span className="text-xs">VIDEO</span>}
+            {post.aiGenerated && <span className="timeline-ai-tag">AI</span>}
+            {post.hasVideo && <span className="timeline-video-tag">VIDEO</span>}
           </div>
-          <div className="text-sm text-[--color-text-secondary]">{post.text}</div>
+          <div className="timeline-text">{post.text}</div>
         </div>
       ))}
     </div>
@@ -123,23 +145,21 @@ function PostTimeline({ posts }) {
 
 function DailyChart({ data }) {
   if (!data || data.length === 0) {
-    return <div className="text-[--color-text-muted] text-sm py-4">No posting data available yet.</div>;
+    return <div className="empty-state">No posting data available yet.</div>;
   }
   const maxCount = Math.max(...data.map((d) => d.count), 1);
   return (
-    <div className="flex items-end gap-1 h-32 mt-2">
+    <div className="daily-chart">
       {data.slice(-14).map((day, i) => (
-        <div key={`${day.date}-${i}`} className="flex-1 flex flex-col items-center gap-1">
-          <div className="w-full relative group">
+        <div key={`${day.date}-${i}`} className="daily-chart-col">
+          <div className="daily-chart-bar-wrap">
             <div
-              className="chart-bar w-full bg-[--color-accent]"
+              className="chart-bar"
               style={{ height: `${(day.count / maxCount) * 100}%`, minHeight: day.count > 0 ? '4px' : '0' }}
             />
-            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] text-[--color-text-muted] opacity-0 group-hover:opacity-100 transition-opacity">
-              {day.count}
-            </div>
+            <div className="daily-chart-tooltip">{day.count}</div>
           </div>
-          <span className="text-[9px] text-[--color-text-muted] rotate-[-45deg] origin-top-left">{day.date?.slice(5) || ''}</span>
+          <span className="daily-chart-label">{day.date?.slice(5) || ''}</span>
         </div>
       ))}
     </div>
@@ -148,7 +168,7 @@ function DailyChart({ data }) {
 
 function AlertLog({ alerts }) {
   if (!alerts || alerts.length === 0) {
-    return <div className="text-[--color-text-muted] text-sm py-4">No alerts in feed.</div>;
+    return <div className="empty-state">No alerts in feed.</div>;
   }
   const severityColor = {
     error: 'var(--color-danger)',
@@ -157,14 +177,14 @@ function AlertLog({ alerts }) {
     success: 'var(--color-success)',
   };
   return (
-    <div className="space-y-2 max-h-60 overflow-y-auto">
+    <div className="alert-list">
       {alerts.slice(0, 20).map((alert, i) => (
-        <div key={`${alert.timestamp || 'unknown'}-${i}`} className="flex gap-3 py-2 border-b border-[--color-border] last:border-0">
-          <div className="w-1 rounded-full flex-shrink-0" style={{ background: severityColor[alert.severity] || '#64748b' }} />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium">{alert.title}</div>
-            <div className="text-xs text-[--color-text-muted] truncate">{alert.message}</div>
-            <div className="text-[10px] text-[--color-text-muted] mt-0.5">{alert.timestamp ? new Date(alert.timestamp).toLocaleString() : ''}</div>
+        <div key={`${alert.timestamp || 'unknown'}-${i}`} className="alert-row">
+          <div className="alert-severity-bar" style={{ background: severityColor[alert.severity] || '#64748b' }} />
+          <div className="alert-content">
+            <div className="alert-title">{alert.title}</div>
+            <div className="alert-message">{alert.message}</div>
+            <div className="alert-time">{alert.timestamp ? new Date(alert.timestamp).toLocaleString() : ''}</div>
           </div>
         </div>
       ))}
@@ -180,11 +200,11 @@ function QueueSummary({ queue }) {
     { label: 'Rejected', value: queue.rejected, color: 'var(--color-danger)' },
   ];
   return (
-    <div className="grid grid-cols-4 gap-3">
+    <div className="queue-grid">
       {items.map((item) => (
-        <div key={item.label} className="text-center">
-          <div className="text-2xl font-bold" style={{ color: item.color }}>{item.value}</div>
-          <div className="text-xs text-[--color-text-muted]">{item.label}</div>
+        <div key={item.label} className="queue-item">
+          <div className="queue-value" style={{ color: item.color }}>{item.value}</div>
+          <div className="queue-label">{item.label}</div>
         </div>
       ))}
     </div>
@@ -209,12 +229,12 @@ function createInitialFormValues(commands) {
 function CommandInput({ field, value, onChange }) {
   if (field.type === 'boolean') {
     return (
-      <label className="flex items-center gap-2 text-sm text-[--color-text-secondary]">
+      <label className="command-checkbox-label">
         <input
           type="checkbox"
           checked={Boolean(value)}
           onChange={(e) => onChange(e.target.checked)}
-          className="accent-[--color-accent]"
+          className="command-checkbox"
         />
         {field.label}
       </label>
@@ -224,9 +244,9 @@ function CommandInput({ field, value, onChange }) {
   if (field.type === 'textarea') {
     return (
       <div>
-        <label className="text-xs text-[--color-text-muted]">{field.label}</label>
+        <label className="command-field-label">{field.label}</label>
         <textarea
-          className="command-input command-textarea mt-1"
+          className="command-input command-textarea"
           value={String(value ?? '')}
           onChange={(e) => onChange(e.target.value)}
         />
@@ -236,12 +256,12 @@ function CommandInput({ field, value, onChange }) {
 
   return (
     <div>
-      <label className="text-xs text-[--color-text-muted]">{field.label}</label>
+      <label className="command-field-label">{field.label}</label>
       <input
         type={field.type === 'number' ? 'number' : 'text'}
         min={field.min}
         max={field.max}
-        className="command-input mt-1"
+        className="command-input"
         value={String(value ?? '')}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -252,15 +272,15 @@ function CommandInput({ field, value, onChange }) {
 function CommandCard({ command, values, onChange, onRun, busy }) {
   return (
     <div className="command-card">
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="command-card-header">
         <div>
-          <h3 className="font-semibold">{command.title}</h3>
-          <p className="text-xs text-[--color-text-muted] mt-1">{command.description}</p>
+          <h3 className="command-title">{command.title}</h3>
+          <p className="command-desc">{command.description}</p>
         </div>
         {busy && <span className="run-chip running">running</span>}
       </div>
 
-      <div className="space-y-2 mb-3">
+      <div className="command-fields">
         {(command.fields || []).map((field) => (
           <CommandInput
             key={`${command.id}-${field.key}`}
@@ -285,9 +305,7 @@ function CommandCard({ command, values, onChange, onRun, busy }) {
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
-  const [token, setToken] = useState(() => bootstrapTokenFromBrowser());
-  const [loading, setLoading] = useState(() => Boolean(token));
-  const [authenticated, setAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [commandData, setCommandData] = useState({ commands: [], runs: [], runningCount: 0, executorMode: 'unknown' });
   const [commandForms, setCommandForms] = useState({});
@@ -295,15 +313,15 @@ export default function Dashboard() {
   const [commandError, setCommandError] = useState('');
   const [selectedRunId, setSelectedRunId] = useState(null);
 
-  const fetchAnalyticsWithToken = useCallback(async (activeToken) => {
-    if (!activeToken) return false;
+  // ClawBot activity state
+  const [clawbotActivities, setClawbotActivities] = useState([]);
 
+  // Ghost Agent pipeline state
+  const [pipeline, setPipeline] = useState(null);
+
+  const fetchAnalytics = useCallback(async () => {
     try {
-      const res = await fetch('/api/sync', {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${activeToken}` },
-        cache: 'no-store',
-      });
+      const res = await fetch('/api/sync', { cache: 'no-store' });
       if (!res.ok) return false;
       const json = await res.json();
       setData(json);
@@ -313,15 +331,9 @@ export default function Dashboard() {
     }
   }, []);
 
-  const fetchCommandsWithToken = useCallback(async (activeToken) => {
-    if (!activeToken) return false;
-
+  const fetchCommands = useCallback(async () => {
     try {
-      const res = await fetch('/api/commands', {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${activeToken}` },
-        cache: 'no-store',
-      });
+      const res = await fetch('/api/commands', { cache: 'no-store' });
       if (!res.ok) return false;
       const json = await res.json();
       setCommandData({
@@ -347,40 +359,41 @@ export default function Dashboard() {
     }
   }, []);
 
+  const fetchPipeline = useCallback(async () => {
+    try {
+      const res = await fetch('/api/lead-pipeline', { cache: 'no-store' });
+      if (!res.ok) return false;
+      const json = await res.json();
+      setPipeline(json);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const fetchClawbot = useCallback(async () => {
+    try {
+      const res = await fetch('/api/clawbot', { cache: 'no-store' });
+      if (!res.ok) return false;
+      const json = await res.json();
+      setClawbotActivities(Array.isArray(json.activities) ? json.activities : []);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
   const refreshAll = useCallback(async () => {
-    if (!token) return;
-
     setLoading(true);
     setCommandsLoading(true);
 
-    const [analyticsOk, commandsOk] = await Promise.all([
-      fetchAnalyticsWithToken(token),
-      fetchCommandsWithToken(token),
-    ]);
+    await Promise.all([fetchAnalytics(), fetchCommands(), fetchPipeline(), fetchClawbot()]);
 
-    const ok = analyticsOk || commandsOk;
-    setAuthenticated(ok);
     setLoading(false);
     setCommandsLoading(false);
-  }, [fetchAnalyticsWithToken, fetchCommandsWithToken, token]);
-
-  const authenticateWithToken = useCallback(async (nextToken) => {
-    if (!nextToken) return;
-    setLoading(true);
-    setCommandsLoading(true);
-
-    const [analyticsOk, commandsOk] = await Promise.all([
-      fetchAnalyticsWithToken(nextToken),
-      fetchCommandsWithToken(nextToken),
-    ]);
-
-    setAuthenticated(analyticsOk || commandsOk);
-    setLoading(false);
-    setCommandsLoading(false);
-  }, [fetchAnalyticsWithToken, fetchCommandsWithToken]);
+  }, [fetchAnalytics, fetchCommands, fetchPipeline, fetchClawbot]);
 
   useEffect(() => {
-    if (!token) return undefined;
     let mounted = true;
 
     const start = async () => {
@@ -391,19 +404,29 @@ export default function Dashboard() {
     void start();
 
     const analyticsInterval = setInterval(() => {
-      void fetchAnalyticsWithToken(token);
+      void fetchAnalytics();
     }, 30000);
 
     const commandInterval = setInterval(() => {
-      void fetchCommandsWithToken(token);
+      void fetchCommands();
+    }, 5000);
+
+    const pipelineInterval = setInterval(() => {
+      void fetchPipeline();
+    }, 30000);
+
+    const clawbotInterval = setInterval(() => {
+      void fetchClawbot();
     }, 5000);
 
     return () => {
       mounted = false;
       clearInterval(analyticsInterval);
       clearInterval(commandInterval);
+      clearInterval(pipelineInterval);
+      clearInterval(clawbotInterval);
     };
-  }, [fetchAnalyticsWithToken, fetchCommandsWithToken, refreshAll, token]);
+  }, [fetchAnalytics, fetchCommands, fetchPipeline, fetchClawbot, refreshAll]);
 
   useEffect(() => {
     const runs = commandData.runs || [];
@@ -440,8 +463,6 @@ export default function Dashboard() {
   }, []);
 
   const handleRunCommand = useCallback(async (commandId) => {
-    if (!token) return;
-
     setCommandError('');
     setCommandsLoading(true);
 
@@ -453,10 +474,7 @@ export default function Dashboard() {
 
       const res = await fetch('/api/commands', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const json = await res.json().catch(() => ({}));
@@ -467,58 +485,23 @@ export default function Dashboard() {
         setSelectedRunId(json.run.id);
       }
 
-      await fetchCommandsWithToken(token);
-      await fetchAnalyticsWithToken(token);
+      await fetchCommands();
+      await fetchAnalytics();
     } catch (error) {
       setCommandError(error.message || 'Unexpected command error');
     } finally {
       setCommandsLoading(false);
     }
-  }, [commandForms, fetchAnalyticsWithToken, fetchCommandsWithToken, token]);
+  }, [commandForms, fetchAnalytics, fetchCommands]);
 
-  if (!authenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="stat-card glow-border max-w-md w-full mx-4">
-          <div className="text-center mb-6">
-            <h1 className="text-xl font-bold">GhostAI Command Center</h1>
-            <p className="text-sm text-[--color-text-muted] mt-1">Authenticate to access operator controls.</p>
-          </div>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const t = String(e.target.token.value || '').trim();
-            if (!t) {
-              setAuthenticated(false);
-              setLoading(false);
-              return;
-            }
-            setToken(t);
-            if (typeof window !== 'undefined') {
-              localStorage.setItem(TOKEN_STORAGE_KEY, t);
-            }
-            void authenticateWithToken(t);
-          }}
-          >
-            <input
-              name="token"
-              type="password"
-              placeholder="Enter access token"
-              autoComplete="off"
-              spellCheck={false}
-              className="w-full px-4 py-3 command-input"
-            />
-            <button
-              type="submit"
-              className="w-full mt-4 command-run-btn"
-            >
-              Authenticate
-            </button>
-          </form>
-          {loading && <div className="text-center text-sm text-[--color-text-muted] mt-4 animate-pulse-subtle">Verifying token...</div>}
-        </div>
-      </div>
-    );
-  }
+  // Split commands into Ghost Agent vs Social
+  const ghostCommands = useMemo(() => {
+    return (commandData.commands || []).filter(c => c.id.startsWith('ghost-'));
+  }, [commandData.commands]);
+
+  const socialCommands = useMemo(() => {
+    return (commandData.commands || []).filter(c => !c.id.startsWith('ghost-'));
+  }, [commandData.commands]);
 
   const d = data || {};
   const platforms = d.platforms || {};
@@ -526,23 +509,35 @@ export default function Dashboard() {
   const pillarMetrics = d.pillarMetrics || {};
   const maxPillarPosts = Math.max(...Object.values(pillarMetrics).map((m) => m?.totalPosts || 0), 1);
 
+  // Pipeline stats
+  const gw = pipeline?.gateway || {};
+  const gwOnline = gw.status === 'ok';
+  const todayStats = pipeline?.pipeline?.today || {};
+  const weeklyStats = pipeline?.pipeline?.weekly || [];
+
   return (
-    <div className="min-h-screen pb-12">
-      <header className="border-b border-[--color-border] px-6 py-4 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto flex justify-between items-center gap-4">
-          <div>
-            <h1 className="text-lg font-bold">GhostAI Command Center</h1>
-            <p className="text-xs text-[--color-text-muted]">
-              {d.lastSync ? `Analytics sync: ${new Date(d.lastSync).toLocaleString()}` : 'Waiting for analytics sync'}
-            </p>
+    <div className="dashboard">
+      <header className="dashboard-header">
+        <div className="dashboard-header-inner">
+          <div className="dashboard-header-title-group">
+            <span className="dashboard-header-emoji">👻</span>
+            <div>
+              <h1 className="dashboard-title">GhostAI Command Center</h1>
+              <p className="dashboard-sync-status">
+                {d.lastSync ? `Analytics sync: ${new Date(d.lastSync).toLocaleString()}` : 'Waiting for analytics sync'}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="run-chip">{commandData.executorMode}</span>
+          <div className="dashboard-header-actions">
+            <span className={`run-chip ${gwOnline ? 'succeeded' : 'failed'}`}>
+              Gateway {gwOnline ? 'Online' : 'Offline'}
+            </span>
+            <span className="run-chip">{gw.tools || 0} tools</span>
             <span className="run-chip">{commandData.runningCount} active</span>
             <button
               type="button"
               onClick={() => void refreshAll()}
-              className="px-4 py-2 text-sm border border-[--color-border] rounded-lg hover:border-[--color-accent] transition-colors"
+              className="refresh-btn"
             >
               Refresh
             </button>
@@ -550,27 +545,63 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 mt-6 space-y-6">
+      <main className="dashboard-main">
+        {/* Ghost Agent Pipeline Stats */}
+        <div className="stats-grid">
+          <StatCard
+            label="Gateway"
+            value={gwOnline ? 'Online' : 'Offline'}
+            icon="👻"
+            color={gwOnline ? 'var(--color-success)' : 'var(--color-danger)'}
+            subtitle={gwOnline ? `Model: ${gw.model || 'gpt-5.4'}` : 'Start with 🚀 Start Gateway'}
+          />
+          <StatCard
+            label="Leads Hunted"
+            value={todayStats.lead_hunted?.count || 0}
+            icon="🎯"
+            color="var(--color-accent)"
+            subtitle={`${weeklyStats.find(w => w.type === 'lead_hunted')?.count || 0} this week`}
+          />
+          <StatCard
+            label="Emails Sent"
+            value={todayStats.email_sent?.count || 0}
+            icon="📧"
+            color="var(--color-warning)"
+            subtitle={`${weeklyStats.find(w => w.type === 'email_sent')?.count || 0} this week`}
+          />
+          <StatCard
+            label="Invoices"
+            value={todayStats.invoice_created?.count || 0}
+            icon="💰"
+            color="var(--color-success)"
+            subtitle={`$${weeklyStats.find(w => w.type === 'invoice_created')?.total || 0} this week`}
+          />
+          <StatCard
+            label="Social Posts"
+            value={todayStats.social_post?.count || 0}
+            icon="📱"
+            subtitle={`${weeklyStats.find(w => w.type === 'social_post')?.count || 0} this week`}
+          />
+        </div>
+
+        {/* Ghost Agent Operations */}
         <section className="stat-card">
-          <div className="flex items-center justify-between mb-4 gap-3">
+          <div className="ops-header">
             <div>
-              <h2 className="font-semibold">Operations</h2>
-              <p className="text-xs text-[--color-text-muted] mt-1">Run automation tasks and monitor output in real time.</p>
+              <h2 className="section-title">👻 Ghost Agent</h2>
+              <p className="section-subtitle">Autonomous revenue engine — send goals, hunt leads, and manage outreach.</p>
             </div>
             {commandsLoading && <span className="run-chip running">syncing...</span>}
           </div>
 
           {commandError && (
-            <div
-              className="mb-4 px-3 py-2 rounded-lg border border-[--color-danger] text-sm text-[--color-danger]"
-              style={{ background: 'rgba(248, 113, 113, 0.1)' }}
-            >
+            <div className="command-error">
               {commandError}
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {(commandData.commands || []).map((command) => (
+          <div className="commands-grid">
+            {ghostCommands.map((command) => (
               <CommandCard
                 key={command.id}
                 command={command}
@@ -583,25 +614,61 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <section className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4">
+        {/* ClawBot Activity Feed */}
+        <section className="stat-card">
+          <div className="ops-header">
+            <div>
+              <h2 className="section-title">🦞 ClawBot Activity</h2>
+              <p className="section-subtitle">Live feed of OpenClaw agent actions — messages, tools, browser, errors.</p>
+            </div>
+            <span className="run-chip" style={{ fontSize: '0.7rem' }}>{clawbotActivities.length} events</span>
+          </div>
+          <ClawbotActivityFeed activities={clawbotActivities} />
+        </section>
+
+        {/* Social Media Operations */}
+        <section className="stat-card">
+          <div className="ops-header">
+            <div>
+              <h2 className="section-title">Social Operations</h2>
+              <p className="section-subtitle">Run automation tasks and monitor output in real time.</p>
+            </div>
+          </div>
+
+          <div className="commands-grid">
+            {socialCommands.map((command) => (
+              <CommandCard
+                key={command.id}
+                command={command}
+                values={commandForms[command.id]}
+                onChange={handleCommandFieldChange}
+                onRun={handleRunCommand}
+                busy={runningCommandIds.has(command.id)}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Command Runs + Live Console */}
+        <section className="runs-layout">
           <div className="stat-card">
-            <h3 className="font-semibold mb-3">Command Runs</h3>
-            <div className="space-y-2 max-h-[420px] overflow-y-auto">
+            <h3 className="section-title">Command Runs</h3>
+            <div className="runs-list">
               {(commandData.runs || []).length === 0 && (
-                <div className="text-sm text-[--color-text-muted]">No runs yet.</div>
+                <div className="empty-state">No runs yet.</div>
               )}
               {(commandData.runs || []).map((run) => (
                 <button
                   type="button"
                   key={run.id}
                   onClick={() => setSelectedRunId(run.id)}
-                  className={`w-full text-left p-3 rounded-lg border transition-colors ${selectedRunId === run.id ? 'border-[--color-accent] bg-[--color-surface-elevated]' : 'border-[--color-border] hover:border-[--color-border-hover]'}`}
+                  className={`run-entry ${selectedRunId === run.id ? 'run-entry-active' : ''}`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-medium">{run.title}</div>
+                  <div className="run-entry-header">
+                    <div className="run-entry-title">{run.title}</div>
                     <span className={`run-chip ${run.status}`}>{run.status}</span>
                   </div>
-                  <div className="text-xs text-[--color-text-muted] mt-1">
+                  <div className="run-entry-time">
                     {new Date(run.startedAt).toLocaleString()}
                   </div>
                 </button>
@@ -610,21 +677,22 @@ export default function Dashboard() {
           </div>
 
           <div className="stat-card">
-            <div className="flex items-center justify-between mb-2 gap-3">
-              <h3 className="font-semibold">Live Console</h3>
+            <div className="console-header">
+              <h3 className="section-title">Live Console</h3>
               {selectedRun && <span className={`run-chip ${selectedRun.status}`}>{selectedRun.status}</span>}
             </div>
-            {!selectedRun && <div className="text-sm text-[--color-text-muted]">Select a run to inspect output.</div>}
+            {!selectedRun && <div className="empty-state">Select a run to inspect output.</div>}
             {selectedRun && (
               <>
-                <div className="text-xs text-[--color-text-muted] mb-2">{selectedRun.commandLine}</div>
+                <div className="console-command-line">{selectedRun.commandLine}</div>
                 <pre className="run-console">{selectedRun.output || 'No output yet...'}</pre>
               </>
             )}
           </div>
         </section>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {/* Analytics Stat Cards Row */}
+        <div className="stats-grid">
           <StatCard label="Total Posts" value={stats.totalPosts || 0} icon="📊" />
           <StatCard label="Today" value={stats.postsToday || 0} icon="📅" color="var(--color-accent)" />
           <StatCard label="AI Generated" value={stats.aiGenerated || 0} icon="🧠" color="var(--color-accent)" />
@@ -632,16 +700,17 @@ export default function Dashboard() {
           <StatCard label="Image Posts" value={stats.imagePosts || 0} icon="🎨" />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Platform Status / Pillars / Queue */}
+        <div className="analytics-grid">
           <div className="stat-card">
-            <h2 className="font-semibold mb-3">Platform Status</h2>
+            <h2 className="section-title">Platform Status</h2>
             {Object.entries(platforms).map(([platform, pData]) => (
               <PlatformStatus key={platform} platform={platform} data={pData} />
             ))}
           </div>
 
           <div className="stat-card">
-            <h2 className="font-semibold mb-3">Content Pillars</h2>
+            <h2 className="section-title">Content Pillars</h2>
             {Object.entries(pillarMetrics).length > 0 ? (
               Object.entries(pillarMetrics).map(([name, metrics]) => (
                 <PillarBar
@@ -653,30 +722,32 @@ export default function Dashboard() {
                 />
               ))
             ) : (
-              <div className="text-[--color-text-muted] text-sm py-4">Pillar data will appear after more activity.</div>
+              <div className="empty-state">Pillar data will appear after more activity.</div>
             )}
           </div>
 
           <div className="stat-card">
-            <h2 className="font-semibold mb-3">Content Queue</h2>
+            <h2 className="section-title">Content Queue</h2>
             <QueueSummary queue={d.queue || { pending: 0, approved: 0, posted: 0, rejected: 0 }} />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Charts Row */}
+        <div className="charts-grid">
           <div className="stat-card">
-            <h2 className="font-semibold mb-1">Daily Posting Activity</h2>
+            <h2 className="section-title">Daily Posting Activity</h2>
             <DailyChart data={d.dailyPosts || []} />
           </div>
 
           <div className="stat-card">
-            <h2 className="font-semibold mb-3">Recent Alerts</h2>
+            <h2 className="section-title">Recent Alerts</h2>
             <AlertLog alerts={d.alerts || []} />
           </div>
         </div>
 
+        {/* Post Timeline */}
         <div className="stat-card">
-          <h2 className="font-semibold mb-3">Post Timeline</h2>
+          <h2 className="section-title">Post Timeline</h2>
           <PostTimeline posts={d.postHistory || []} />
         </div>
       </main>

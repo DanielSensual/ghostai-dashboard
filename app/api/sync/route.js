@@ -1,13 +1,6 @@
 import { NextResponse } from 'next/server';
-import crypto from 'node:crypto';
 import { getData, setData } from '@/lib/store';
 
-const DEV_FALLBACK_TOKEN = 'ghostai-dev-token';
-const AUTH_TOKEN = process.env.DASHBOARD_SECRET
-    || (process.env.NODE_ENV === 'production' ? '' : DEV_FALLBACK_TOKEN);
-const ALLOW_DEV_FALLBACK_TOKEN = process.env.ALLOW_DEV_FALLBACK_TOKEN !== 'false';
-
-const ALLOW_QUERY_TOKEN_AUTH = process.env.ALLOW_QUERY_TOKEN_AUTH !== 'false';
 const MAX_BODY_BYTES = Math.max(1024, Number.parseInt(process.env.DASHBOARD_MAX_BODY_BYTES || '1048576', 10) || 1048576);
 const RATE_LIMIT_WINDOW_MS = Math.max(1000, Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_WINDOW_MS || '60000', 10) || 60000);
 const RATE_LIMIT_MAX_GET = Math.max(10, Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_MAX_GET || '180', 10) || 180);
@@ -27,7 +20,6 @@ function withSecurityHeaders(response) {
     response.headers.set('Referrer-Policy', 'no-referrer');
     response.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
     response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    response.headers.set('Vary', 'Authorization');
     return response;
 }
 
@@ -76,41 +68,6 @@ function checkRateLimit(request, limit) {
     return response;
 }
 
-function getBearerToken(request) {
-    const raw = request.headers.get('Authorization') || '';
-    const [scheme, token] = raw.split(' ');
-    if (scheme?.toLowerCase() !== 'bearer') return '';
-    return token || '';
-}
-
-function timingSafeTokenCheck(candidate, expected) {
-    if (!candidate || !expected) return false;
-    const a = Buffer.from(String(candidate));
-    const b = Buffer.from(String(expected));
-    if (a.length !== b.length) return false;
-    return crypto.timingSafeEqual(a, b);
-}
-
-function isAuthorized(request, { allowQuery = false } = {}) {
-    const headerToken = getBearerToken(request);
-    if (timingSafeTokenCheck(headerToken, AUTH_TOKEN)) return true;
-    if (ALLOW_DEV_FALLBACK_TOKEN && timingSafeTokenCheck(headerToken, DEV_FALLBACK_TOKEN)) return true;
-
-    if (!allowQuery) return false;
-    const queryToken = new URL(request.url).searchParams.get('token') || '';
-    if (timingSafeTokenCheck(queryToken, AUTH_TOKEN)) return true;
-    if (ALLOW_DEV_FALLBACK_TOKEN && timingSafeTokenCheck(queryToken, DEV_FALLBACK_TOKEN)) return true;
-    return false;
-}
-
-function ensureAuthConfigured() {
-    if (AUTH_TOKEN || ALLOW_DEV_FALLBACK_TOKEN) return null;
-    return jsonResponse(
-        { error: 'Server misconfigured: DASHBOARD_SECRET must be set' },
-        { status: 500 }
-    );
-}
-
 function sanitizeIncomingPayload(payload) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         throw new Error('Invalid payload');
@@ -148,30 +105,16 @@ function sanitizeIncomingPayload(payload) {
 
 // GET: Return current dashboard data
 export async function GET(request) {
-    const configError = ensureAuthConfigured();
-    if (configError) return configError;
-
     const rateLimited = checkRateLimit(request, RATE_LIMIT_MAX_GET);
     if (rateLimited) return rateLimited;
-
-    if (!isAuthorized(request, { allowQuery: ALLOW_QUERY_TOKEN_AUTH })) {
-        return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     return jsonResponse(getData());
 }
 
 // POST: Receive data push from the bot
 export async function POST(request) {
-    const configError = ensureAuthConfigured();
-    if (configError) return configError;
-
     const rateLimited = checkRateLimit(request, RATE_LIMIT_MAX_POST);
     if (rateLimited) return rateLimited;
-
-    if (!isAuthorized(request)) {
-        return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const contentType = request.headers.get('content-type') || '';
     if (!contentType.toLowerCase().includes('application/json')) {
