@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import GodModeTerminal from './components/GodModeTerminal';
 
 const PILLAR_COLORS = {
   value: '#22d3ee',
@@ -63,12 +64,12 @@ function ClawbotActivityFeed({ activities }) {
 
 function StatCard({ label, value, icon, subtitle, color }) {
   return (
-    <div className="stat-card">
+    <div className="stat-card hud-brackets">
       <div className="stat-card-header">
         <span className="stat-card-label">{label}</span>
         <span className="stat-card-icon">{icon}</span>
       </div>
-      <div className="stat-card-value" style={{ color: color || 'var(--color-text-primary)' }}>
+      <div className="stat-card-value" style={{ color: color || 'var(--color-accent-blue)' }}>
         {value}
       </div>
       {subtitle && <div className="stat-card-subtitle">{subtitle}</div>}
@@ -81,19 +82,19 @@ function PlatformStatus({ platform, data }) {
   return (
     <div className="platform-row">
       <div className="platform-info">
-        <span className="platform-icon-box">
+        <span className="platform-icon-box" style={{ borderColor: statusClass === 'online' ? 'var(--color-success)' : 'var(--color-danger)' }}>
           {PLATFORM_ICONS[platform] || platform[0]?.toUpperCase()}
         </span>
         <div>
-          <div className="platform-name">{platform === 'x' ? 'X (Twitter)' : platform}</div>
-          <div className="platform-last-post">
-            {data.lastPost ? `Last post: ${new Date(data.lastPost).toLocaleString()}` : 'No post recorded'}
+          <div className="platform-name" style={{ color: 'var(--color-text-primary)' }}>{platform === 'x' ? 'X (TWITTER)' : platform.toUpperCase()}</div>
+          <div className="platform-last-post" style={{ fontFamily: 'var(--font-mono)' }}>
+            {data.lastPost ? `LST:[${new Date(data.lastPost).toLocaleTimeString()}]` : 'NO DATA'}
           </div>
         </div>
       </div>
       <div className="platform-status">
         <span className={`status-dot ${statusClass}`} />
-        <span className="platform-status-label">{data.status}</span>
+        <span className="platform-status-label" style={{ fontFamily: 'var(--font-mono)' }}>{data.status.toUpperCase()}</span>
       </div>
     </div>
   );
@@ -271,7 +272,7 @@ function CommandInput({ field, value, onChange }) {
 
 function CommandCard({ command, values, onChange, onRun, busy }) {
   return (
-    <div className="command-card">
+    <div className="command-card hud-brackets">
       <div className="command-card-header">
         <div>
           <h3 className="command-title">{command.title}</h3>
@@ -297,7 +298,7 @@ function CommandCard({ command, values, onChange, onRun, busy }) {
         disabled={busy}
         onClick={() => onRun(command.id)}
       >
-        {busy ? 'Running...' : 'Run Command'}
+        {busy ? 'EXECUTING...' : 'INITIATE COMMAND'}
       </button>
     </div>
   );
@@ -312,6 +313,7 @@ export default function Dashboard() {
   const [commandsLoading, setCommandsLoading] = useState(false);
   const [commandError, setCommandError] = useState('');
   const [selectedRunId, setSelectedRunId] = useState(null);
+  const [godModeOpen, setGodModeOpen] = useState(false);
 
   // ClawBot activity state
   const [clawbotActivities, setClawbotActivities] = useState([]);
@@ -518,11 +520,12 @@ export default function Dashboard() {
   return (
     <div className="dashboard">
       <header className="dashboard-header">
+        <div className="header-decor" />
         <div className="dashboard-header-inner">
           <div className="dashboard-header-title-group">
-            <span className="dashboard-header-emoji">👻</span>
+            <span className="dashboard-header-emoji" style={{ color: 'var(--color-accent-blue)', textShadow: 'var(--glow-cyan)' }}>⟁</span>
             <div>
-              <h1 className="dashboard-title">GhostAI Command Center</h1>
+              <h1 className="dashboard-title">GHOST // COMMAND CENTER</h1>
               <p className="dashboard-sync-status">
                 {d.lastSync ? `Analytics sync: ${new Date(d.lastSync).toLocaleString()}` : 'Waiting for analytics sync'}
               </p>
@@ -534,6 +537,14 @@ export default function Dashboard() {
             </span>
             <span className="run-chip">{gw.tools || 0} tools</span>
             <span className="run-chip">{commandData.runningCount} active</span>
+            <button
+              type="button"
+              onClick={() => setGodModeOpen(true)}
+              className="refresh-btn"
+              style={{ border: '1px solid var(--color-accent-amber)', color: 'var(--color-accent-amber)', fontWeight: 700 }}
+            >
+              [ OVERRIDE PROTOCOL ]
+            </button>
             <button
               type="button"
               onClick={() => void refreshAll()}
@@ -585,11 +596,11 @@ export default function Dashboard() {
         </div>
 
         {/* Ghost Agent Operations */}
-        <section className="stat-card">
+        <section className="stat-card hud-brackets">
           <div className="ops-header">
             <div>
-              <h2 className="section-title">👻 Ghost Agent</h2>
-              <p className="section-subtitle">Autonomous revenue engine — send goals, hunt leads, and manage outreach.</p>
+              <h2 className="section-title">SYSTEM.AGENTS // GHOST</h2>
+              <p className="section-subtitle">Autonomous revenue engine — telemetry active.</p>
             </div>
             {commandsLoading && <span className="run-chip running">syncing...</span>}
           </div>
@@ -615,7 +626,7 @@ export default function Dashboard() {
         </section>
 
         {/* ClawBot Activity Feed */}
-        <section className="stat-card">
+        <section className="stat-card hud-brackets">
           <div className="ops-header">
             <div>
               <h2 className="section-title">🦞 ClawBot Activity</h2>
@@ -627,7 +638,7 @@ export default function Dashboard() {
         </section>
 
         {/* Social Media Operations */}
-        <section className="stat-card">
+        <section className="stat-card hud-brackets">
           <div className="ops-header">
             <div>
               <h2 className="section-title">Social Operations</h2>
@@ -651,7 +662,7 @@ export default function Dashboard() {
 
         {/* Command Runs + Live Console */}
         <section className="runs-layout">
-          <div className="stat-card">
+          <div className="stat-card hud-brackets">
             <h3 className="section-title">Command Runs</h3>
             <div className="runs-list">
               {(commandData.runs || []).length === 0 && (
@@ -676,7 +687,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card hud-brackets">
             <div className="console-header">
               <h3 className="section-title">Live Console</h3>
               {selectedRun && <span className={`run-chip ${selectedRun.status}`}>{selectedRun.status}</span>}
@@ -702,14 +713,14 @@ export default function Dashboard() {
 
         {/* Platform Status / Pillars / Queue */}
         <div className="analytics-grid">
-          <div className="stat-card">
+          <div className="stat-card hud-brackets">
             <h2 className="section-title">Platform Status</h2>
             {Object.entries(platforms).map(([platform, pData]) => (
               <PlatformStatus key={platform} platform={platform} data={pData} />
             ))}
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card hud-brackets">
             <h2 className="section-title">Content Pillars</h2>
             {Object.entries(pillarMetrics).length > 0 ? (
               Object.entries(pillarMetrics).map(([name, metrics]) => (
@@ -726,7 +737,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card hud-brackets">
             <h2 className="section-title">Content Queue</h2>
             <QueueSummary queue={d.queue || { pending: 0, approved: 0, posted: 0, rejected: 0 }} />
           </div>
@@ -734,23 +745,24 @@ export default function Dashboard() {
 
         {/* Charts Row */}
         <div className="charts-grid">
-          <div className="stat-card">
+          <div className="stat-card hud-brackets">
             <h2 className="section-title">Daily Posting Activity</h2>
             <DailyChart data={d.dailyPosts || []} />
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card hud-brackets">
             <h2 className="section-title">Recent Alerts</h2>
             <AlertLog alerts={d.alerts || []} />
           </div>
         </div>
 
         {/* Post Timeline */}
-        <div className="stat-card">
+        <div className="stat-card hud-brackets">
           <h2 className="section-title">Post Timeline</h2>
           <PostTimeline posts={d.postHistory || []} />
         </div>
       </main>
+      <GodModeTerminal isOpen={godModeOpen} onClose={() => setGodModeOpen(false)} />
     </div>
   );
 }

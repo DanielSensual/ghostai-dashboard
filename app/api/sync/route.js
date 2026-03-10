@@ -103,12 +103,39 @@ function sanitizeIncomingPayload(payload) {
     return safe;
 }
 
-// GET: Return current dashboard data
+// GET: Return current dashboard data (with cold-start fallback)
 export async function GET(request) {
     const rateLimited = checkRateLimit(request, RATE_LIMIT_MAX_GET);
     if (rateLimited) return rateLimited;
 
-    return jsonResponse(getData());
+    const data = getData();
+
+    // Cold-start fallback: if no data has been synced, try to pull from gateway
+    if (!data.lastSync) {
+        const gatewayUrl = (process.env.GATEWAY_URL || '').trim().replace(/\/+$/, '');
+        if (gatewayUrl) {
+            try {
+                const [healthRes, pipelineRes] = await Promise.all([
+                    fetch(`${gatewayUrl}/health`, { signal: AbortSignal.timeout(5000) }),
+                    fetch(`${gatewayUrl}/pipeline`, { signal: AbortSignal.timeout(5000) }),
+                ]);
+                if (healthRes.ok && pipelineRes.ok) {
+                    const health = await healthRes.json();
+                    const pipeline = await pipelineRes.json();
+                    data._gateway = {
+                        status: health.status,
+                        tools: health.tools,
+                        pendingGoals: pipeline.pendingGoals || 0,
+                    };
+                    data._coldStart = true;
+                }
+            } catch {
+                // Gateway unreachable — return empty data
+            }
+        }
+    }
+
+    return jsonResponse(data);
 }
 
 // POST: Receive data push from the bot

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const GATEWAY_URL = (process.env.GATEWAY_URL || 'http://127.0.0.1:19000').replace(/\/+$/, '');
+const GATEWAY_URL = (process.env.GATEWAY_URL || 'http://127.0.0.1:19000').trim().replace(/\/+$/, '');
 
 function withSecurityHeaders(response) {
     response.headers.set('Cache-Control', 'no-store, max-age=0');
