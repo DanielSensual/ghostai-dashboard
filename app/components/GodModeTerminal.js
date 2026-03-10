@@ -444,24 +444,42 @@ export default function GodModeTerminal({ isOpen, onClose }) {
                 }
             });
 
+            // Step 1: Get ephemeral client_secret from our server
+            const tokenResponse = await fetch('/api/realtime/session', {
+                method: 'POST',
+                headers: authHeaders('application/json'),
+            });
+
+            if (!tokenResponse.ok) {
+                const errData = await tokenResponse.json().catch(() => ({}));
+                throw new Error(errData?.error || `Session token failed: HTTP ${tokenResponse.status}`);
+            }
+
+            const { client_secret } = await tokenResponse.json();
+            if (!client_secret) {
+                throw new Error('Server returned empty client secret.');
+            }
+
+            // Step 2: Create SDP offer
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
 
-            const response = await fetch('/api/realtime/session', {
+            // Step 3: Exchange SDP directly with OpenAI using the ephemeral key
+            const sdpResponse = await fetch('https://api.openai.com/v1/realtime/calls', {
                 method: 'POST',
-                headers: authHeaders('application/sdp'),
-                body: offer.sdp,
+                headers: {
+                    'Authorization': `Bearer ${client_secret}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ sdp: offer.sdp }),
             });
 
-            const answerSdp = await response.text();
-            if (!response.ok) {
-                let errorMessage = answerSdp;
-                try {
-                    const payload = JSON.parse(answerSdp);
-                    errorMessage = payload?.error || answerSdp;
-                } catch { /* keep raw text */ }
-                throw new Error(errorMessage || `HTTP ${response.status}`);
+            if (!sdpResponse.ok) {
+                const errText = await sdpResponse.text();
+                throw new Error(errText || `SDP exchange failed: HTTP ${sdpResponse.status}`);
             }
+
+            const answerSdp = await sdpResponse.text();
 
             await peerConnection.setRemoteDescription({
                 type: 'answer',

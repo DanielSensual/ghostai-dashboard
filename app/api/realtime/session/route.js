@@ -32,11 +32,6 @@ function jsonResponse(payload, init = {}) {
     return withSecurityHeaders(NextResponse.json(payload, init));
 }
 
-function textResponse(body, init = {}) {
-    const response = new NextResponse(body, init);
-    return withSecurityHeaders(response);
-}
-
 function authenticate(request) {
     if (!GOD_MODE_SECRET) {
         return { ok: false, error: 'Voice control is not configured. Set GOD_MODE_SECRET.', status: 503 };
@@ -56,6 +51,13 @@ function authenticate(request) {
     return { ok: true };
 }
 
+/**
+ * POST /api/realtime/session
+ *
+ * Returns an ephemeral client_secret for client-side WebRTC SDP exchange.
+ * The client uses this token to authenticate directly with OpenAI's
+ * /v1/realtime/calls endpoint, avoiding server-side SDP proxying.
+ */
 export async function POST(request) {
     const auth = authenticate(request);
     if (!auth.ok) {
@@ -66,52 +68,61 @@ export async function POST(request) {
         return jsonResponse({ error: 'OPENAI_API_KEY is not configured.' }, { status: 503 });
     }
 
-    const contentType = (request.headers.get('content-type') || '').toLowerCase();
-    if (!contentType.includes('application/sdp') && !contentType.includes('text/plain')) {
-        return jsonResponse({ error: 'Expected SDP offer body.' }, { status: 415 });
-    }
-
     try {
-        const sdp = (await request.text()).trim();
-        if (!sdp) {
-            return jsonResponse({ error: 'Missing SDP offer.' }, { status: 400 });
-        }
+        const payload = {
+            session: {
+                type: 'realtime',
+                model: REALTIME_MODEL,
+                voice: REALTIME_VOICE,
+                instructions: GHOST_SYSTEM_INSTRUCTIONS,
+                audio: {
+                    output: { voice: REALTIME_VOICE },
+                    input: { transcription: { model: 'whisper-1' } },
+                },
+            },
+        };
 
-        const formData = new FormData();
-        formData.set('sdp', sdp);
-        formData.set('session', JSON.stringify({
-            type: 'realtime',
-            model: REALTIME_MODEL,
-            voice: REALTIME_VOICE,
-            instructions: GHOST_SYSTEM_INSTRUCTIONS,
-        }));
-
-        const response = await fetch('https://api.openai.com/v1/realtime/calls', {
+        const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
             method: 'POST',
             headers: {
-                Authorization: `Bearer ${OPENAI_API_KEY}`,
+                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                'Content-Type': 'application/json',
             },
-            body: formData,
+            body: JSON.stringify(payload),
             cache: 'no-store',
-            signal: AbortSignal.timeout(20000),
+            signal: AbortSignal.timeout(15000),
         });
 
-        const answerSdp = await response.text();
-
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('OpenAI client_secrets error:', { status: response.status, error: errorText });
             return jsonResponse(
-                { error: answerSdp || 'Failed to create Realtime session.' },
+                { error: errorText || 'Failed to create Realtime session.' },
                 { status: response.status || 502 }
             );
         }
 
-        return textResponse(answerSdp, {
-            status: 200,
-            headers: {
-                'Content-Type': 'application/sdp',
-            },
+        const data = await response.json();
+
+        // Support varying response structures across API versions
+        const clientSecret =
+            data?.value ||
+            data?.client_secret?.value ||
+            data?.session?.client_secret?.value;
+
+        if (!clientSecret) {
+            console.error('OpenAI client_secrets: missing secret in response', data);
+            return jsonResponse({ error: 'Missing client secret in OpenAI response.' }, { status: 502 });
+        }
+
+        return jsonResponse({
+            client_secret: clientSecret,
+            model: REALTIME_MODEL,
+            voice: REALTIME_VOICE,
+            expires_at: data?.expires_at ?? data?.session?.expires_at ?? data?.client_secret?.expires_at,
         });
     } catch (error) {
+        console.error('Realtime session error:', error);
         return jsonResponse(
             { error: error.message || 'Failed to establish Realtime session.' },
             { status: 500 }
