@@ -532,6 +532,12 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="dashboard-header-actions">
+            <a href="/sales-closer" className="refresh-btn" style={{ border: '1px solid hsl(15, 100%, 55%)', color: 'hsl(15, 100%, 55%)', fontWeight: 700, textDecoration: 'none' }}>
+              [ 🎯 CLOSER ]
+            </a>
+            <a href="/lead-pipeline" className="refresh-btn" style={{ textDecoration: 'none' }}>
+              [ PIPELINE ]
+            </a>
             <span className={`run-chip ${gwOnline ? 'succeeded' : 'failed'}`}>
               Gateway {gwOnline ? 'Online' : 'Offline'}
             </span>

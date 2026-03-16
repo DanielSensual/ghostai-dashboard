@@ -56,18 +56,18 @@ async function callAgent(pathname, method = 'GET', body = null) {
 export async function GET() {
     try {
         const agentResponse = await callAgent('/state', 'GET');
-        if (agentResponse) {
-            if (!agentResponse.ok) {
-                return jsonResponse(
-                    { error: agentResponse.payload?.error || 'Command agent unavailable' },
-                    { status: agentResponse.status || 502 }
-                );
-            }
+        if (agentResponse && agentResponse.ok) {
             return jsonResponse(agentResponse.payload);
         }
+        // Gateway /state not available — fall back to local command catalog
         return jsonResponse(getCommandCenterState());
     } catch (error) {
-        return jsonResponse({ error: error.message || 'Failed to load command state' }, { status: 500 });
+        // Network error reaching agent — still show local commands
+        try {
+            return jsonResponse(getCommandCenterState());
+        } catch {
+            return jsonResponse({ error: error.message || 'Failed to load command state' }, { status: 500 });
+        }
     }
 }
 
