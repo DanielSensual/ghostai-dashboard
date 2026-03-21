@@ -65,10 +65,7 @@ async function callAgent(pathname, method = 'GET', body = null) {
     };
 }
 
-export async function GET(request) {
-    const auth = authenticate(request);
-    if (!auth.ok) return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
-
+export async function GET() {
     try {
         const agentResponse = await callAgent('/state', 'GET');
         if (agentResponse && agentResponse.ok) {
