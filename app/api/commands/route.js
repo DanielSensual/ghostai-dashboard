@@ -3,6 +3,18 @@ import { getCommandCenterState, runCommand } from '@/lib/command-center-store';
 
 const COMMAND_AGENT_URL = (process.env.COMMAND_AGENT_URL || '').trim();
 const COMMAND_AGENT_TOKEN = (process.env.COMMAND_AGENT_TOKEN || '').trim();
+const DASHBOARD_API_KEY = (process.env.DASHBOARD_API_KEY || COMMAND_AGENT_TOKEN).trim();
+
+function authenticate(request) {
+    if (!DASHBOARD_API_KEY) return { ok: true }; // No key configured = allow (dev mode)
+    const authHeader = request.headers.get('authorization') || '';
+    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    const headerKey = (request.headers.get('x-api-key') || '').trim();
+    if ((bearerToken || headerKey) && (bearerToken === DASHBOARD_API_KEY || headerKey === DASHBOARD_API_KEY)) {
+        return { ok: true };
+    }
+    return { ok: false };
+}
 
 function withSecurityHeaders(response) {
     response.headers.set('Cache-Control', 'no-store, max-age=0');
@@ -53,7 +65,10 @@ async function callAgent(pathname, method = 'GET', body = null) {
     };
 }
 
-export async function GET() {
+export async function GET(request) {
+    const auth = authenticate(request);
+    if (!auth.ok) return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
+
     try {
         const agentResponse = await callAgent('/state', 'GET');
         if (agentResponse && agentResponse.ok) {
@@ -72,6 +87,9 @@ export async function GET() {
 }
 
 export async function POST(request) {
+    const auth = authenticate(request);
+    if (!auth.ok) return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
+
     const contentType = request.headers.get('content-type') || '';
     if (!contentType.toLowerCase().includes('application/json')) {
         return jsonResponse({ error: 'Unsupported content type' }, { status: 415 });

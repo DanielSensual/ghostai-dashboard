@@ -5,6 +5,18 @@ const MAX_BODY_BYTES = Math.max(1024, Number.parseInt(process.env.DASHBOARD_MAX_
 const RATE_LIMIT_WINDOW_MS = Math.max(1000, Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_WINDOW_MS || '60000', 10) || 60000);
 const RATE_LIMIT_MAX_GET = Math.max(10, Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_MAX_GET || '180', 10) || 180);
 const RATE_LIMIT_MAX_POST = Math.max(5, Number.parseInt(process.env.DASHBOARD_RATE_LIMIT_MAX_POST || '60', 10) || 60);
+const DASHBOARD_SYNC_TOKEN = (process.env.DASHBOARD_SYNC_TOKEN || process.env.COMMAND_AGENT_TOKEN || '').trim();
+
+function authenticateSync(request) {
+    if (!DASHBOARD_SYNC_TOKEN) return { ok: true }; // No token = allow (dev mode)
+    const authHeader = request.headers.get('authorization') || '';
+    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    const headerKey = (request.headers.get('x-api-key') || '').trim();
+    if ((bearerToken || headerKey) && (bearerToken === DASHBOARD_SYNC_TOKEN || headerKey === DASHBOARD_SYNC_TOKEN)) {
+        return { ok: true };
+    }
+    return { ok: false };
+}
 
 const rateLimitStore = globalThis.__ghostaiDashboardRateLimit || new Map();
 if (!globalThis.__ghostaiDashboardRateLimit) {
@@ -140,6 +152,11 @@ export async function GET(request) {
 
 // POST: Receive data push from the bot
 export async function POST(request) {
+    const authResult = authenticateSync(request);
+    if (!authResult.ok) {
+        return jsonResponse({ error: 'Unauthorized — set DASHBOARD_SYNC_TOKEN' }, { status: 401 });
+    }
+
     const rateLimited = checkRateLimit(request, RATE_LIMIT_MAX_POST);
     if (rateLimited) return rateLimited;
 
