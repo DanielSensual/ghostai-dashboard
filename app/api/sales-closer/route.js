@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+
+export const runtime = 'nodejs';
 
 // Resolve lead-hunter DB path
 const DB_PATH = process.env.GHOSTAI_LEAD_DB_PATH
@@ -39,6 +40,8 @@ export async function GET() {
 
     let db;
     try {
+        const moduleName = 'better-sqlite3';
+        const { default: Database } = await import(moduleName);
         db = new Database(DB_PATH, { readonly: true });
         db.pragma('journal_mode = WAL');
 
