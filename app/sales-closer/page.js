@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 
 const TIER_STYLES = {
     close_now: { emoji: '🔥', label: 'CLOSE NOW', color: 'hsl(15, 100%, 55%)', bg: 'hsla(15, 100%, 55%, 0.12)' },
@@ -161,9 +162,12 @@ export default function SalesCloserPage() {
     }, []);
 
     useEffect(() => {
-        void fetchData();
+        const initialLoad = setTimeout(() => void fetchData(), 0);
         const interval = setInterval(() => void fetchData(), 15000);
-        return () => clearInterval(interval);
+        return () => {
+            clearTimeout(initialLoad);
+            clearInterval(interval);
+        };
     }, [fetchData]);
 
     const tiers = data?.signalTiers || { closeNow: 0, warmPursuit: 0, dormant: 0 };
@@ -187,8 +191,8 @@ export default function SalesCloserPage() {
                         </div>
                     </div>
                     <div className="dashboard-header-actions">
-                        <a href="/" className="refresh-btn">← Command Center</a>
-                        <a href="/lead-pipeline" className="refresh-btn">Lead Pipeline</a>
+                        <Link href="/" className="refresh-btn">← Command Center</Link>
+                        <Link href="/lead-pipeline" className="refresh-btn">Lead Pipeline</Link>
                         <button type="button" onClick={() => { setLoading(true); void fetchData(); }} className="refresh-btn">
                             ↻ Refresh
                         </button>
